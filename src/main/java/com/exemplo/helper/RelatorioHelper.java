@@ -9,41 +9,31 @@ import com.itextpdf.text.pdf.PdfWriter;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class RelatorioHelper {
 	
 	private static Document document;
+	private final static Font FONTE_TOPICOS = new Font(Font.FontFamily.HELVETICA, 12, Font.NORMAL, BaseColor.BLACK);
+	private final static Font FONTE_TEXTOS_NORMAIS = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL, BaseColor.BLACK);
+	private final static Font FONTE_TITULO = new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, BaseColor.BLACK);
 
-	private final static Font FONTE_TOPICOS = new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, BaseColor.BLACK);
-	
-	private final static Font FONTE_TEXTOS_NORMAIS = new Font(Font.FontFamily.HELVETICA, 12, Font.NORMAL, BaseColor.BLACK);
-	
-	private final static Font FONTE_TITULO = new Font(Font.FontFamily.HELVETICA, 20, Font.BOLD, BaseColor.BLACK);
-	
-	public static String geraPdf(Relatorio relatorio){
-		String arquivo = null;
-		try {
-			arquivo = relatorio.getEndereco() + relatorio.getNome().replaceAll("[.\\/\"\'<>\\|\\*\\+%@#$&\\(\\)]", "").trim() + ".pdf";
-//			criaPdf(arquivo);
-			adicionaNome(relatorio.getNome());
-			adicionaCabecalho(relatorio.getCabecalho(), relatorio.getNome());
-			adicionaTabelaDados(relatorio.getCampos(), relatorio.getLinhas());
-			concluiDocumento();
-		} catch (Exception e) {
-			System.err.println(e.getMessage());
-		}
-		return arquivo;
-	}
-    
-	public static String criaPdf(String endereco, String nome){
+	/**
+	 * Cria o arquivo no formato PDF.
+	 * @param endereco para salvar o arquivo.
+	 * @param nome do arquivo.
+	 * @param margens array de int de 4 posições determinando as margens, nessa ordem: esquerda, direita, cima, baixo.
+	 * @return caminho completo do arquivo gerado.
+	 */
+	public static String criaPdf(String endereco, String nome, int[] margens){
 		document = new Document();
 		String arquivo = endereco + nome.replaceAll("[.\\/\"\'<>\\|\\*\\+%@#$&\\(\\)]", "").trim() + ".pdf";
 		try {
 			PdfWriter.getInstance(document, new FileOutputStream(arquivo));
 			document.setPageSize(PageSize.A4);
-			document.setMargins(20, 20, 20, 20);
+			document.setMargins(margens[0], margens[1], margens[2], margens[3]);
 			document.open();
 		} catch(DocumentException | IOException de) {
             System.err.println(de.getMessage());
@@ -55,21 +45,33 @@ public class RelatorioHelper {
 		document.addTitle(nome);
 	}
 	
-	public static void adicionaCabecalho(String cabecalho, String nome){
+	public static void adicionaCabecalhoImagem(String enderecoImagem, String texto1, String texto2){
 		try {
-			document.add(new Paragraph(nome, FONTE_TITULO));
-			document.add(new Paragraph(cabecalho, FONTE_TEXTOS_NORMAIS));
-			document.add(new Paragraph(" "));
-		} catch (DocumentException de) {
+			PdfPTable tabela = new PdfPTable(new float[] {1, 3.5f, 3.5f});
+			tabela.setWidthPercentage(100.0f);
+			PdfPCell cellImagem = new PdfPCell(Image.getInstance(enderecoImagem));
+			PdfPCell cell1 = new PdfPCell(new Paragraph(texto1, FONTE_TOPICOS));
+			PdfPCell cell2 = new PdfPCell(new Paragraph(texto2, FONTE_TOPICOS));
+			cellImagem.setBorder(0);
+			cellImagem.setFixedHeight(60.0f);
+			cell1.setBorder(0);
+			cell1.setVerticalAlignment(Element.ALIGN_MIDDLE);
+			cell2.setBorder(0);
+			cell2.setVerticalAlignment(Element.ALIGN_MIDDLE);
+			tabela.addCell(cellImagem);
+			tabela.addCell(cell1);
+			tabela.addCell(cell2);
+			document.add(tabela);
+		} catch (DocumentException | IOException de) {
             System.err.println(de.getMessage());
-        }
+		}
 	}
 
 	public static void adicionaQuadroTitulo(String texto, boolean fundoEscuro, boolean centralizado) {
 		try {
 			PdfPTable tabela = criaTabela(1, false);
 			PdfPCell cell = new PdfPCell(new Paragraph(texto, FONTE_TOPICOS));
-			cell.setVerticalAlignment(Element.ALIGN_CENTER);
+			cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
 			if (fundoEscuro) { cell.setBackgroundColor(BaseColor.LIGHT_GRAY); }
 			if (centralizado) { cell.setHorizontalAlignment(Element.ALIGN_CENTER); }
 			tabela.addCell(cell);
@@ -82,25 +84,45 @@ public class RelatorioHelper {
 	public static void adicionaQuadroTexto(int colunas, List<Linha> linhas) {
 		try {
 			PdfPTable tabela = criaTabela(colunas, false);
-			List<Paragraph> paragraphs = new ArrayList<>();
 			for (Linha linha : linhas) {
 				for (String celula : linha.getCelulas()) {
-					paragraphs.add(new Paragraph(celula, FONTE_TEXTOS_NORMAIS));
+					PdfPCell cell = new PdfPCell(new Paragraph(celula, FONTE_TEXTOS_NORMAIS));
+					cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+					cell.setBorder(0);
+					tabela.addCell(cell);
 				}
 			}
-			PdfPCell cell = new PdfPCell();
-			paragraphs.forEach(cell::addElement);
-			cell.setVerticalAlignment(Element.ALIGN_CENTER);
-			tabela.addCell(cell);
 			document.add(tabela);
 		} catch (DocumentException e) {
 			System.err.println(e.getMessage());
 		}
 	}
 
-	public static void adicionaTexto(String texto) {
+	public static void adicionaTexto(String texto, boolean centralizado) {
 		try {
-			document.add(new Paragraph(texto, FONTE_TEXTOS_NORMAIS));
+			Paragraph paragraph = new Paragraph(texto, FONTE_TEXTOS_NORMAIS);
+			if (centralizado) { paragraph.setAlignment(Element.ALIGN_CENTER); }
+			document.add(paragraph);
+		} catch (DocumentException e) {
+			System.err.println(e.getMessage());
+		}
+	}
+
+	public static void adicionaTextoTitulo(String texto, boolean centralizado) {
+		try {
+			Paragraph paragraph = new Paragraph(texto, FONTE_TITULO);
+			if (centralizado) { paragraph.setAlignment(Element.ALIGN_CENTER); }
+			document.add(paragraph);
+		} catch (DocumentException e) {
+			System.err.println(e.getMessage());
+		}
+	}
+
+	public static void adicionaTextoADireita(String texto) {
+		try {
+			Paragraph paragraph = new Paragraph(texto, FONTE_TEXTOS_NORMAIS);
+			paragraph.setAlignment(Element.ALIGN_RIGHT);
+			document.add(paragraph);
 		} catch (DocumentException e) {
 			System.err.println(e.getMessage());
 		}
@@ -115,45 +137,36 @@ public class RelatorioHelper {
 	}
 
 	public static void adicionaTabelaDados(List<String> campos, List<Linha> linhas) {
-		int tam = campos.size();
-		PdfPTable tabela = criaTabela(tam, true);
-		campos.forEach(campo -> {
-			PdfPCell celula = new PdfPCell(new Paragraph(campo, FONTE_TOPICOS));
-			celula.setBorder(0);
-			tabela.addCell(celula);
-		});
-		int linhaDoc = 2;
-		for (Linha linha : linhas) {
-			for (String celula : linha.getCelulas()) {
-				PdfPCell cell = new PdfPCell(new Paragraph(celula, FONTE_TEXTOS_NORMAIS));
-				cell.setBorder(0);
-				if(linhaDoc % 2 == 0) { cell.setBackgroundColor(BaseColor.LIGHT_GRAY); }
-				tabela.addCell(cell);
-			}
-			linhaDoc++;
-		}
-		adicionaTabela(tabela);
-	}
-	
-	private static void adicionaTabela(PdfPTable tabela){
 		try {
+			int tam = campos.size();
+			PdfPTable tabela = criaTabela(tam, true);
+			campos.forEach(campo -> {
+				PdfPCell cell = new PdfPCell(new Paragraph(campo, FONTE_TOPICOS));
+				cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+				cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+				cell.setBorder(0);
+				cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
+				tabela.addCell(cell);
+			});
+			int linhaDoc = 2;
+			for (Linha linha : linhas) {
+				for (String celula : linha.getCelulas()) {
+					PdfPCell cell = new PdfPCell(new Paragraph(celula, FONTE_TEXTOS_NORMAIS));
+					cell.setBorder(0);
+					cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+					if (linhaDoc % 2 != 0) {
+						cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
+					}
+					tabela.addCell(cell);
+				}
+				linhaDoc++;
+			}
 			document.add(tabela);
-			document.add(new Paragraph(" "));
 		} catch (DocumentException e) {
 			System.err.println(e.getMessage());
 		}
 	}
 
-	private void addCalculo(String tipoTotal, String valor) {
-		String somatorio = "* " + tipoTotal + ": " + valor + ";";
-		try {
-			document.add(new Paragraph(somatorio, FONTE_TOPICOS));
-			document.add(new Paragraph(" "));
-		} catch (DocumentException de) {
-            System.err.println(de.getMessage());
-        }
-	}
-	
 	private static PdfPTable criaTabela(int tam, boolean semBorda) {
 		PdfPTable tabela = new PdfPTable(tam);
 		if (semBorda) { tabela.getDefaultCell().setBorder(PdfPCell.NO_BORDER); }
@@ -161,9 +174,9 @@ public class RelatorioHelper {
 		tabela.setHorizontalAlignment(Element.ALIGN_CENTER);
 		return tabela;
 	}
-	
-	public static void concluiDocumento() {
+
+	public static void concluiPdf() {
 		document.close();
 	}
-	
+
 }
