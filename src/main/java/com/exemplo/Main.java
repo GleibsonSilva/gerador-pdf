@@ -19,6 +19,7 @@ public class Main {
         geraRelatorio3();
     }
 
+
     public static void geraRelatorio1() {
         List<Linha> dados = new ArrayList<>();
         Linha linha1 = new Linha(Arrays.asList("Razão Social: TRTRQ RPRSNTC LTD",               ""));
